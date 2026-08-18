@@ -2,7 +2,7 @@
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>StrideRead</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -41,17 +41,59 @@
         .pulse-speed-anim { animation: pulse-speed 0.4s ease-out; }
     </style>
 </head>
-<body class="h-screen w-screen flex flex-row">
+<body class="h-screen w-screen flex flex-col md:flex-row bg-[#0f172a] text-slate-100 overflow-hidden">
     
-    <!-- Sidebar: Runner Mode & Gesture Control -->
-    <aside class="w-80 border-r border-slate-800 flex flex-col p-6 gap-8 relative z-20 bg-slate-900/50 shadow-xl shrink-0">
+    <!-- Floating Global Gesture UI Wrapper -->
+    <!-- On Desktop: Anchored to the bottom left inside the sidebar area -->
+    <!-- On Mobile: Floats at the top center under the header -->
+    <div id="gesture-ui-wrapper" class="fixed z-40 flex flex-col pointer-events-none 
+                top-20 left-1/2 -translate-x-1/2 items-center w-auto
+                md:top-auto md:bottom-6 md:left-6 md:-translate-x-0 md:w-[272px] md:items-start">
+        
+        <div class="text-sm font-semibold text-slate-200 mb-3 hidden md:flex justify-between items-center w-full">
+            <span>Gesture Controls</span>
+        </div>
+        
+        <!-- Camera Container -->
+        <div id="webcam-container" class="pointer-events-auto relative flex justify-center items-center w-full md:aspect-video bg-transparent md:bg-slate-800 rounded-full md:rounded-xl overflow-hidden md:border-2 border-slate-700 transition-colors shadow-2xl md:shadow-none">
+            
+            <!-- Enable Button -->
+            <button id="enable-camera-btn" class="relative z-10 w-auto md:absolute md:inset-0 md:w-full md:h-full flex flex-row md:flex-col items-center justify-center bg-indigo-600 hover:bg-indigo-500 md:bg-slate-800 md:hover:bg-slate-700 transition px-6 py-2.5 md:p-0 whitespace-nowrap rounded-full md:rounded-none active:scale-95 md:active:scale-100 shadow-lg md:shadow-none">
+                <span class="text-lg md:text-2xl md:mb-2 mr-2 md:mr-0 inline-block md:block">📷</span>
+                <span class="text-sm font-medium text-center text-white md:text-slate-200 inline-block md:block">
+                    Enable Gestures<br class="hidden md:block"><span class="hidden md:block text-xs text-slate-400 font-normal">for touch-free controls</span>
+                </span>
+            </button>
+
+            <!-- Video Feed (Visually hidden on mobile to save space, but functional) -->
+            <div class="absolute opacity-0 w-1 h-1 overflow-hidden md:static md:opacity-100 md:w-full md:h-full">
+                <video id="webcam-video" class="w-full h-full object-cover hidden -scale-x-100" autoplay playsinline></video>
+            </div>
+        </div>
+        
+        <!-- Status Pill -->
+        <div class="mt-2 md:mt-3 flex items-center justify-center gap-2 bg-slate-900/95 md:bg-transparent px-4 py-1.5 md:p-0 rounded-full border border-slate-700/50 md:border-transparent backdrop-blur pointer-events-auto shadow-xl md:shadow-none transition-all">
+            <div id="pulse-dot" class="w-2 h-2 rounded-full bg-slate-600 transition-colors"></div>
+            <span id="gesture-status" class="text-xs md:text-sm text-slate-300 md:text-slate-400 font-medium">Camera inactive</span>
+        </div>
+
+        <!-- Controls Reference (Desktop only) -->
+        <div class="hidden md:block pointer-events-auto bg-slate-800/30 rounded-xl p-4 text-xs text-slate-400 space-y-2 mt-4 border border-slate-800 w-full">
+            <p>✋ <b>Pause/Resume</b></p>
+            <p>☝️ <b>Rewind</b> (hold)</p>
+            <p>👍 <b>Faster</b> / ✊ <b>Slower</b> (hold)</p>
+        </div>
+    </div>
+
+    <!-- Sidebar: Hidden completely on mobile screens -->
+    <aside class="hidden md:flex flex-col w-80 border-r border-slate-800 p-6 gap-8 bg-slate-900/50 shadow-xl shrink-0 z-20">
         <!-- Branding -->
         <div>
             <h1 class="text-2xl font-bold tracking-tight text-indigo-400">StrideRead</h1>
             <p class="text-sm text-slate-400 uppercase tracking-widest mt-1">Runner Mode</p>
         </div>
 
-        <!-- Stats -->
+        <!-- Desktop Stats -->
         <div class="flex flex-col gap-4 text-slate-300">
             <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
                 <div class="text-xs text-slate-400 mb-1 uppercase tracking-wider">Distance</div>
@@ -62,62 +104,35 @@
                 <div class="text-xl font-semibold text-slate-100">~24 <span class="text-sm font-normal text-slate-400">min</span></div>
             </div>
         </div>
-
-        <!-- Gesture Panel -->
-        <div class="mt-auto">
-            <div class="text-sm font-semibold text-slate-200 mb-3 flex justify-between items-center">
-                <span>Gesture Controls</span>
-            </div>
-            
-            <div id="webcam-container" class="relative w-full aspect-video bg-slate-800 rounded-xl overflow-hidden border-2 border-slate-700 transition-colors">
-                <button id="enable-camera-btn" class="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-slate-800 hover:bg-slate-700 transition z-10">
-                    <span class="text-2xl mb-2">📷</span>
-                    <span class="text-sm font-medium text-center px-4">Enable Camera<br><span class="text-xs text-slate-400 font-normal">for touch-free controls</span></span>
-                </button>
-                <video id="webcam-video" class="absolute inset-0 w-full h-full object-cover hidden -scale-x-100" autoplay playsinline></video>
-            </div>
-            
-            <!-- Status text -->
-            <div class="mt-3 flex items-center justify-center gap-2">
-                <div id="pulse-dot" class="w-2 h-2 rounded-full bg-slate-600 transition-colors"></div>
-                <span id="gesture-status" class="text-sm text-slate-400 font-medium">Camera inactive</span>
-            </div>
-        </div>
-        
-        <!-- Controls reference -->
-        <div class="bg-slate-800/30 rounded-xl p-4 text-xs text-slate-400 space-y-2 mt-4 border border-slate-800">
-            <p>✋ <b>Pause/Resume</b> (hold)</p>
-            <p>☝️ <b>Rewind</b> (hold)</p>
-            <p>👍 <b>Faster</b> / ✊ <b>Slower</b></p>
-        </div>
+        <!-- Note: Bottom of sidebar is visually filled by the absolute gesture-ui-wrapper -->
     </aside>
 
     <!-- Main Reading Area -->
-    <main class="flex-1 flex flex-col relative h-full bg-[#0B1121]">
+    <main class="flex-1 flex flex-col relative h-full min-w-0 bg-[#0B1121]">
         
-        <!-- Top bar: Book Info -->
-        <header class="h-20 shrink-0 flex items-center justify-between px-12 border-b border-slate-800/50 bg-slate-900/20 backdrop-blur-sm z-10">
-            <div>
-                <h2 class="text-lg font-semibold text-slate-200">The Great Gatsby</h2>
-                <p class="text-sm text-slate-500">Chapter 1</p>
+        <!-- Header -->
+        <header class="h-16 md:h-20 shrink-0 flex items-center justify-between px-4 md:px-12 border-b border-slate-800/50 bg-slate-900/80 md:bg-slate-900/20 backdrop-blur-md z-10">
+            <div class="min-w-0 pr-4">
+                <h2 class="text-base md:text-lg font-semibold text-slate-200 truncate">The Great Gatsby</h2>
+                <p class="text-xs md:text-sm text-slate-500 truncate">Chapter 1</p>
             </div>
             
-            <!-- Manual Controls (Top right) -->
-            <div class="flex items-center gap-2">
-                <button onclick="window.changeTextSize(-1)" class="w-10 h-10 rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700 flex items-center justify-center text-lg transition">A-</button>
-                <button onclick="window.changeTextSize(1)" class="w-10 h-10 rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700 flex items-center justify-center text-lg transition">A+</button>
+            <div class="flex items-center gap-1 md:gap-2 shrink-0">
+                <button onclick="window.changeTextSize(-1)" class="w-10 h-10 rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700 flex items-center justify-center text-sm md:text-lg transition active:scale-95 touch-manipulation">A-</button>
+                <button onclick="window.changeTextSize(1)" class="w-10 h-10 rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700 flex items-center justify-center text-sm md:text-lg transition active:scale-95 touch-manipulation">A+</button>
             </div>
         </header>
 
-        <!-- Gesture Feedback Overlay (Subtle pill style) -->
-        <div id="gesture-overlay" class="absolute top-12 left-1/2 -translate-x-1/2 bg-slate-800/95 backdrop-blur-md rounded-full px-6 py-3 flex items-center gap-3 opacity-0 pointer-events-none z-50 transition-all duration-300 shadow-2xl border border-white/10 transform -translate-y-4">
-            <span id="gesture-emoji" class="text-2xl drop-shadow-sm">✋</span>
-            <span id="gesture-text" class="text-sm font-bold tracking-[0.15em] text-slate-200 uppercase">PAUSED</span>
+        <!-- Dynamic Gesture Action Overlay -->
+        <div id="gesture-overlay" class="absolute top-36 md:top-12 left-1/2 -translate-x-1/2 bg-slate-800/95 backdrop-blur-md rounded-full px-6 py-2.5 flex items-center gap-3 opacity-0 pointer-events-none z-50 transition-all duration-300 shadow-2xl border border-white/10 transform -translate-y-4">
+            <span id="gesture-emoji" class="text-xl md:text-2xl drop-shadow-sm">✋</span>
+            <span id="gesture-text" class="text-xs md:text-sm font-bold tracking-[0.15em] text-slate-200 uppercase">PAUSED</span>
         </div>
 
-        <!-- Reading Content (Scrollable) -->
-        <div id="scroll-container" class="flex-1 overflow-y-auto px-12 py-16">
-            <div class="max-w-3xl mx-auto book-text text-3xl leading-relaxed text-slate-300 space-y-8 pb-[50vh]">
+        <!-- Scrollable Content -->
+        <!-- Note: We use JS to update scrollTop. No CSS scroll-behavior: smooth to prevent fighting -->
+        <div id="scroll-container" class="flex-1 overflow-y-auto overflow-x-hidden px-6 py-10 md:px-12 md:py-16">
+            <div class="max-w-3xl mx-auto book-text text-3xl md:text-4xl leading-[1.8] md:leading-relaxed text-slate-300 space-y-8 pb-[50vh]">
                 <p>In my younger and more vulnerable years my father gave me some advice that I've been turning over in my mind ever since.</p>
                 <p>"Whenever you feel like criticizing any one," he told me, "just remember that all the people in this world haven't had the advantages that you've had."</p>
                 <p>He didn't say any more, but we've always been unusually communicative in a reserved way, and I understood that he meant a great deal more than that. In consequence, I'm inclined to reserve all judgments, a habit that has opened up many curious natures to me and also made me the victim of not a few veteran bores.</p>
@@ -129,7 +144,6 @@
                 <p>This responsiveness had nothing to do with that flabby impressionability which is dignified under the name of the "creative temperament." — it was an extraordinary gift for hope, a romantic readiness such as I have never found in any other person and which it is not likely I shall ever find again.</p>
                 <p>No — Gatsby turned out all right at the end; it is what preyed on Gatsby, what foul dust floated in the wake of his dreams that temporarily closed out my interest in the abortive sorrows and short-winded elations of men.</p>
                 
-                <!-- Extra content to ensure scroll behavior is noticeable -->
                 <p>My family have been prominent, well-to-do people in this Middle Western city for three generations. The Carraways are something of a clan, and we have a tradition that we're descended from the Dukes of Buccleuch, but the actual founder of my line was my grandfather's brother, who came here in fifty-one, sent a substitute to the Civil War, and started the wholesale hardware business that my father carries on to-day.</p>
                 <p>I never saw this great-uncle, but I'm supposed to look like him — with special reference to the rather hard-boiled painting that hangs in father's office I graduated from New Haven in 1915, just a quarter of a century after my father, and a little later I participated in that delayed Teutonic migration known as the Great War. I enjoyed the counter-raid so thoroughly that I came back restless.</p>
                 <p>Instead of being the warm centre of the world, the Middle West now seemed like the ragged edge of the universe — so I decided to go East and learn the bond business. Everybody I knew was in the bond business, so I supposed it could support one more single man. All my aunts and uncles talked it over as if they were choosing a prep school for me, and finally said, "Why — ye — es," with very grave, hesitant faces.</p>
@@ -138,30 +152,43 @@
             </div>
         </div>
 
-        <!-- Bottom Progress & Manual Controls Bar -->
-        <footer class="h-24 shrink-0 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-8 relative z-20 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+        <!-- Adaptive Footer Area -->
+        <footer class="shrink-0 bg-slate-900 border-t border-slate-800 flex flex-col justify-center px-4 py-4 md:py-0 md:flex-row md:items-center md:justify-between md:px-8 md:h-24 relative z-20 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] gap-3 md:gap-0">
             <!-- Progress Bar Background -->
             <div class="absolute top-0 left-0 w-full h-1 bg-slate-800">
                 <div id="progress-bar" class="h-full bg-indigo-500 w-0 transition-all duration-300"></div>
             </div>
 
-            <div class="flex items-center gap-6">
-                <button onclick="window.togglePlay()" class="w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center text-2xl shadow-lg transition transform hover:scale-105">
+            <!-- Mobile-Only Stats Row -->
+            <div class="flex md:hidden items-center justify-between w-full text-xs text-slate-400 font-medium px-1 mb-1">
+                <div>2.4 <span class="text-slate-500 font-normal">/ 5.0 mi</span></div>
+                <div>~24 <span class="text-slate-500 font-normal">min</span></div>
+                <div class="text-indigo-400">Pace: Med</div>
+            </div>
+
+            <!-- Controls Row -->
+            <div class="flex items-center justify-between md:justify-start w-full md:w-auto gap-3 md:gap-6 px-1 md:px-0">
+                
+                <!-- Play / Pause -->
+                <button onclick="window.togglePlay()" class="w-14 h-14 shrink-0 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center text-2xl shadow-lg transition transform hover:scale-105 active:scale-95 touch-manipulation">
                     <span id="play-icon" class="ml-1">▶️</span>
                     <span id="pause-icon" class="hidden">⏸️</span>
                 </button>
                 
-                <div class="flex items-center gap-4 bg-slate-800/80 rounded-full px-2 py-2">
-                    <button onclick="window.changeSpeed(-0.5)" class="w-10 h-10 rounded-full hover:bg-slate-700 text-slate-300 flex items-center justify-center transition">✊</button>
-                    <!-- Added a distinct ID to the container for the pulse animation -->
+                <!-- Speed Adjustment -->
+                <div class="flex items-center gap-1 md:gap-4 bg-slate-800/80 rounded-full px-1.5 md:px-2 py-1.5 md:py-2 flex-1 md:flex-none justify-between md:justify-center">
+                    <button onclick="window.changeSpeedDiscrete(-0.5)" class="w-12 h-12 md:w-10 md:h-10 rounded-full hover:bg-slate-700 text-slate-300 flex items-center justify-center transition text-xl md:text-base active:bg-slate-600 touch-manipulation">✊</button>
+                    
                     <div id="speed-container" class="w-16 text-center font-mono font-bold text-slate-200 rounded-lg">
-                        <span id="speed-indicator" class="inline-block px-2 py-1 rounded">1.0x</span>
+                        <span id="speed-indicator" class="inline-block px-1 py-1 rounded text-base">1.0x</span>
                     </div>
-                    <button onclick="window.changeSpeed(0.5)" class="w-10 h-10 rounded-full hover:bg-slate-700 text-slate-300 flex items-center justify-center transition">👍</button>
+                    
+                    <button onclick="window.changeSpeedDiscrete(0.5)" class="w-12 h-12 md:w-10 md:h-10 rounded-full hover:bg-slate-700 text-slate-300 flex items-center justify-center transition text-xl md:text-base active:bg-slate-600 touch-manipulation">👍</button>
                 </div>
             </div>
             
-            <div class="text-right text-slate-500 text-sm">
+            <!-- Desktop-Only Pace Reference -->
+            <div class="hidden md:block text-right text-slate-500 text-sm">
                 <p>Avg Pace: <span class="text-slate-300">Medium</span></p>
             </div>
         </footer>
@@ -186,11 +213,12 @@
         const enableCameraBtn = document.getElementById('enable-camera-btn');
         const gestureStatus = document.getElementById('gesture-status');
         const pulseDot = document.getElementById('pulse-dot');
-        const webcamContainer = document.getElementById('webcam-container');
 
         // Reading State
-        let isPlaying = false;
-        let scrollSpeed = 1.0;
+        window.isPlaying = false;
+        window.scrollSpeed = 1.0;
+        
+        // Continuous Gesture States
         let isRewinding = false;
         let isIncreasingSpeed = false;
         let isDecreasingSpeed = false;
@@ -203,14 +231,18 @@
         // Gesture Processing State
         let currentGesture = null;
         let gestureStartTime = 0;
-        let gestureActionFired = false;
+        let gestureActionFired = false; 
+        
+        // UI Feedback State
         let activeBriefFeedback = false;
         let feedbackTimeout = null;
-        
-        // Tolerance / Debounce State
         let lastRawGesture = null;
         let lastRawGestureTime = Date.now();
 
+        // ---------------------------------------------------------
+        // UI Management Functions
+        // ---------------------------------------------------------
+        
         function updateOverlayUI(text, emoji, isBounce) {
             gestureText.innerText = text;
             gestureEmoji.innerText = emoji;
@@ -231,28 +263,25 @@
             gestureOverlay.classList.remove('animate-gentle-bounce');
         }
 
-        // Determines what the permanent background state should be
         function evaluateOverlayState() {
             if (activeBriefFeedback) return;
 
             if (isRewinding) {
                 updateOverlayUI('REWINDING', '↩️', true);
             } else if (isIncreasingSpeed) {
-                updateOverlayUI(`FASTER (${scrollSpeed.toFixed(1)}x)`, '👍', false);
+                updateOverlayUI(`FASTER\nSpeed: ${window.scrollSpeed.toFixed(1)}x`, '👍', false);
             } else if (isDecreasingSpeed) {
-                updateOverlayUI(`SLOWER (${scrollSpeed.toFixed(1)}x)`, '✊', false);
-            } else if (!isPlaying) {
+                updateOverlayUI(`SLOWER\nSpeed: ${window.scrollSpeed.toFixed(1)}x`, '✊', false);
+            } else if (!window.isPlaying) {
                 updateOverlayUI('PAUSED', '✋', false);
             } else {
                 hideOverlayUI();
             }
         }
         
-        // Temporarily interrupts the overlay to show brief actions (e.g., Resumed)
         function showGestureFeedback(text, emoji) {
             clearTimeout(feedbackTimeout);
 
-            // If it's a persistent state, let the main evaluator handle it
             if (text === 'PAUSED' || text === 'REWINDING') {
                 activeBriefFeedback = false;
                 evaluateOverlayState();
@@ -262,7 +291,6 @@
             activeBriefFeedback = true;
             updateOverlayUI(text, emoji, false);
             
-            // Wait slightly over 1s, then revert to background state
             feedbackTimeout = setTimeout(() => {
                 activeBriefFeedback = false;
                 evaluateOverlayState();
@@ -270,33 +298,46 @@
         }
 
         function updateUI() {
-            if (isPlaying) {
+            if (window.isPlaying) {
                 playIcon.classList.add('hidden');
                 pauseIcon.classList.remove('hidden');
             } else {
                 playIcon.classList.remove('hidden');
                 pauseIcon.classList.add('hidden');
             }
-            speedIndicator.innerText = scrollSpeed.toFixed(1) + 'x';
+            speedIndicator.innerText = window.scrollSpeed.toFixed(1) + 'x';
         }
 
+        function pulseSpeedIndicator() {
+            speedContainer.classList.remove('pulse-speed-anim');
+            void speedContainer.offsetWidth; 
+            speedContainer.classList.add('pulse-speed-anim');
+        }
+
+        // ---------------------------------------------------------
+        // Core Scroll & State Loop (Centralized)
+        // ---------------------------------------------------------
+        
         function scrollLoop() {
-            // Centralized scroll movement
+            // Priority 1: If rewinding, scroll backward (overrides normal play)
             if (isRewinding) {
-                scrollContainer.scrollTop -= (scrollSpeed * 1.5); // Smooth, slow rewind (~30% of old speed)
-            } else if (isPlaying) {
-                scrollContainer.scrollTop += (scrollSpeed * 0.8);
+                // Match the forward scroll speed for backward scrub
+                scrollContainer.scrollTop -= (window.scrollSpeed * 0.8); 
+            } 
+            // Priority 2: If playing (and not rewinding), scroll forward
+            else if (window.isPlaying) {
+                scrollContainer.scrollTop += (window.scrollSpeed * 0.8);
             }
             
-            // Continuous smooth speed adjustments (applies every frame while gesture is held)
+            // Continuous Speed Adjustments (Independent of scrolling state)
             if (isIncreasingSpeed) {
-                scrollSpeed = Math.min(4.0, scrollSpeed + 0.01);
+                window.scrollSpeed = Math.min(4.0, window.scrollSpeed + 0.01);
                 updateUI();
-                evaluateOverlayState(); // Refresh dynamic text
+                evaluateOverlayState(); 
             } else if (isDecreasingSpeed) {
-                scrollSpeed = Math.max(0.5, scrollSpeed - 0.01);
+                window.scrollSpeed = Math.max(0.5, window.scrollSpeed - 0.01);
                 updateUI();
-                evaluateOverlayState(); // Refresh dynamic text
+                evaluateOverlayState(); 
             }
             
             // Update progress bar
@@ -313,20 +354,20 @@
         updateUI();
         evaluateOverlayState();
 
-        // Manual controls overrides
+        // ---------------------------------------------------------
+        // Manual / Keyboard Controls
+        // ---------------------------------------------------------
+
         window.togglePlay = function(forceState = null) {
-            isPlaying = forceState !== null ? forceState : !isPlaying;
+            window.isPlaying = forceState !== null ? forceState : !window.isPlaying;
             updateUI();
             evaluateOverlayState();
         };
 
-        window.changeSpeed = function(delta) {
-            scrollSpeed = Math.max(0.5, Math.min(scrollSpeed + delta, 4.0));
+        window.changeSpeedDiscrete = function(delta) {
+            window.scrollSpeed = Math.max(0.5, Math.min(window.scrollSpeed + delta, 4.0));
             updateUI();
-            
-            speedContainer.classList.remove('pulse-speed-anim');
-            void speedContainer.offsetWidth; 
-            speedContainer.classList.add('pulse-speed-anim');
+            pulseSpeedIndicator();
         };
 
         window.changeTextSize = function(delta) {
@@ -338,24 +379,30 @@
         };
 
         window.addEventListener('keydown', (e) => {
-            if(["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].indexOf(e.code) > -1) {
+            if(["Space", "ArrowUp", "ArrowDown"].indexOf(e.code) > -1) {
                 e.preventDefault();
             }
             switch(e.code) {
                 case 'Space':
                     window.togglePlay();
-                    showGestureFeedback(isPlaying ? 'RESUMED' : 'PAUSED', isPlaying ? '▶️' : '✋');
+                    showGestureFeedback(window.isPlaying ? 'RESUMED' : 'PAUSED', window.isPlaying ? '▶️' : '✋');
                     break;
                 case 'ArrowUp':
-                    window.changeSpeed(0.5);
-                    showGestureFeedback(`FASTER (${scrollSpeed.toFixed(1)}x)`, '👍');
+                    window.changeSpeedDiscrete(0.5);
+                    showGestureFeedback('FASTER', '👍');
+                    pulseSpeedIndicator();
                     break;
                 case 'ArrowDown':
-                    window.changeSpeed(-0.5);
-                    showGestureFeedback(`SLOWER (${scrollSpeed.toFixed(1)}x)`, '✊');
+                    window.changeSpeedDiscrete(-0.5);
+                    showGestureFeedback('SLOWER', '✊');
+                    pulseSpeedIndicator();
                     break;
             }
         });
+
+        // ---------------------------------------------------------
+        // MediaPipe Initialization & Loop
+        // ---------------------------------------------------------
 
         async function initializeHandLandmarker() {
             gestureStatus.innerText = "Initializing AI...";
@@ -437,10 +484,7 @@
 
                 let detectedRaw = null;
                 if (results.landmarks && results.landmarks.length > 0) {
-                    webcamContainer.classList.add('border-indigo-500');
                     detectedRaw = getGesture(results.landmarks[0]);
-                } else {
-                    webcamContainer.classList.remove('border-indigo-500');
                 }
                 
                 // Debounce raw gesture to tolerate brief tracking fluctuations
@@ -457,10 +501,11 @@
                         gestureActionFired = false;
                         
                         // Clear continuous states on gesture change
+                        let stateChanged = isRewinding || isIncreasingSpeed || isDecreasingSpeed;
                         isRewinding = false;
                         isIncreasingSpeed = false;
                         isDecreasingSpeed = false;
-                        evaluateOverlayState();
+                        if (stateChanged) evaluateOverlayState();
                     }
                 }
 
@@ -468,14 +513,16 @@
                     const holdTime = Date.now() - gestureStartTime;
                     let displayState = "Tracking hand...";
 
+                    // 1. OPEN PALM -> Discrete Toggle Play/Pause
                     if (currentGesture === 'OPEN_PALM') {
                         if (holdTime >= 500 && !gestureActionFired) {
                             window.togglePlay();
                             gestureActionFired = true;
-                            showGestureFeedback(isPlaying ? 'RESUMED' : 'PAUSED', isPlaying ? '▶️' : '✋');
+                            showGestureFeedback(window.isPlaying ? 'RESUMED' : 'PAUSED', window.isPlaying ? '▶️' : '✋');
                         }
-                        displayState = isPlaying ? "▶️ Resumed" : "✋ Paused";
+                        displayState = window.isPlaying ? "▶️ Resumed" : "✋ Paused";
                     } 
+                    // 2. POINT UP -> Continuous Rewind
                     else if (currentGesture === 'POINT_UP') {
                         if (holdTime >= 200) {
                             if (!isRewinding) {
@@ -485,19 +532,23 @@
                         }
                         displayState = "↩️ Rewinding";
                     }
+                    // 3. THUMB UP -> Continuous Faster
                     else if (currentGesture === 'THUMB_UP') {
-                        if (holdTime >= 300) {
+                        if (holdTime >= 200) {
                             if (!isIncreasingSpeed) {
                                 isIncreasingSpeed = true;
+                                pulseSpeedIndicator();
                                 evaluateOverlayState();
                             }
                         }
                         displayState = "👍 Faster";
                     }
+                    // 4. CLOSED FIST -> Continuous Slower
                     else if (currentGesture === 'CLOSED_FIST') {
-                        if (holdTime >= 300) {
+                        if (holdTime >= 200) {
                             if (!isDecreasingSpeed) {
                                 isDecreasingSpeed = true;
+                                pulseSpeedIndicator();
                                 evaluateOverlayState();
                             }
                         }
