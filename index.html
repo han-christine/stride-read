@@ -1,765 +1,523 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StrideRead - Running E-Reader</title>
+    <title>StrideRead</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0f172a; /* Slate 900 */
-            color: #f8fafc; /* Slate 50 */
-            overflow: hidden;
-            user-select: none;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@400;700&display=swap');
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #0f172a; 
+            color: #f8fafc; 
+            overflow: hidden; 
         }
         
-        .reading-font {
-            font-family: 'Merriweather', serif;
-        }
-
-        /* Hide scrollbar for a clean UI */
-        ::-webkit-scrollbar {
-            width: 0px;
-            background: transparent;
-        }
-
-        .fade-top {
-            background: linear-gradient(to bottom, #0f172a 0%, rgba(15, 23, 42, 0) 100%);
+        .book-text { 
+            font-family: 'Merriweather', serif; 
         }
         
-        .fade-bottom {
-            background: linear-gradient(to top, #0f172a 0%, rgba(15, 23, 42, 0) 100%);
-        }
+        /* Custom Scrollbar for the reading area */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-        .glass-panel {
-            background: rgba(30, 41, 59, 0.7); /* Slate 800 */
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        /* Gentle bounce for persistent gesture states (Rewinding) */
+        @keyframes gentle-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
         }
+        .animate-gentle-bounce { animation: gentle-bounce 2s ease-in-out infinite; }
 
-        .webcam-feed {
-            background: linear-gradient(45deg, #1e293b, #0f172a);
-            position: relative;
-            overflow: hidden;
+        /* Pulse animation for speed changes */
+        @keyframes pulse-speed {
+            0% { transform: scale(1); background-color: transparent; }
+            50% { transform: scale(1.1); background-color: rgba(99, 102, 241, 0.4); }
+            100% { transform: scale(1); background-color: transparent; }
         }
-        
-        .webcam-feed::after {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: repeating-linear-gradient(
-                0deg,
-                transparent,
-                transparent 2px,
-                rgba(255,255,255,0.02) 2px,
-                rgba(255,255,255,0.02) 4px
-            );
-            pointer-events: none;
-        }
-
-        /* Pulse animation for running indicator */
-        @keyframes pulse-dot {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
-        }
-        
-        .status-dot {
-            animation: pulse-dot 2s infinite;
-        }
+        .pulse-speed-anim { animation: pulse-speed 0.4s ease-out; }
     </style>
 </head>
-<body class="flex h-screen w-screen text-slate-300">
+<body class="h-screen w-screen flex flex-row">
+    
+    <!-- Sidebar: Runner Mode & Gesture Control -->
+    <aside class="w-80 border-r border-slate-800 flex flex-col p-6 gap-8 relative z-20 bg-slate-900/50 shadow-xl shrink-0">
+        <!-- Branding -->
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight text-indigo-400">StrideRead</h1>
+            <p class="text-sm text-slate-400 uppercase tracking-widest mt-1">Runner Mode</p>
+        </div>
 
-    <aside class="w-80 border-r border-slate-800 bg-slate-900 flex flex-col z-20 shadow-2xl relative">
-        <!-- App Header -->
-        <div class="p-6 border-b border-slate-800">
-            <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-                <i class="ph-fill ph-sneaker text-indigo-500"></i> StrideRead
-            </h1>
-            <div class="mt-4">
-                <p class="text-sm text-slate-400 font-medium tracking-wider uppercase">Currently Reading</p>
-                <h2 class="text-xl font-serif text-white mt-1">The Great Gatsby</h2>
-                <p class="text-sm text-slate-500 mt-1">Chapter 1</p>
+        <!-- Stats -->
+        <div class="flex flex-col gap-4 text-slate-300">
+            <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                <div class="text-xs text-slate-400 mb-1 uppercase tracking-wider">Distance</div>
+                <div class="text-xl font-semibold text-slate-100">2.4 <span class="text-sm font-normal text-slate-400">/ 5.0 mi</span></div>
+            </div>
+            <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                <div class="text-xs text-slate-400 mb-1 uppercase tracking-wider">Time Remaining</div>
+                <div class="text-xl font-semibold text-slate-100">~24 <span class="text-sm font-normal text-slate-400">min</span></div>
             </div>
         </div>
 
-        <!-- Runner Mode UI -->
-        <div class="p-6 border-b border-slate-800 flex-1">
-            <div class="flex items-center justify-between mb-6">
-                <h3 class="text-xs font-bold text-slate-400 tracking-widest uppercase">Runner Mode</h3>
-                <div class="flex items-center gap-2">
-                    <div class="w-2 h-2 rounded-full bg-green-500 status-dot"></div>
-                    <span class="text-xs font-medium text-green-500">ACTIVE</span>
-                </div>
-            </div>
-
-            <div class="space-y-5">
-                <!-- Distance -->
-                <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                    <p class="text-xs text-slate-400 mb-1">Distance</p>
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-2xl font-bold text-white">2.4</span>
-                        <span class="text-sm text-slate-500">/ 5.0 mi</span>
-                    </div>
-                    <!-- Progress bar -->
-                    <div class="w-full bg-slate-700 h-1.5 rounded-full mt-3 overflow-hidden">
-                        <div class="bg-indigo-500 h-full rounded-full w-[48%]"></div>
-                    </div>
-                </div>
-
-                <!-- Pace & Time -->
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                        <p class="text-xs text-slate-400 mb-1">Running Pace</p>
-                        <span class="text-lg font-semibold text-white">Medium</span>
-                    </div>
-                    <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-                        <p class="text-xs text-slate-400 mb-1">Remaining</p>
-                        <span class="text-lg font-semibold text-white">~24 min</span>
-                    </div>
-                </div>
-                
-                <!-- Reading Stats -->
-                <div class="pt-4 border-t border-slate-800/50">
-                    <div class="flex justify-between items-center mb-1">
-                        <p class="text-xs text-slate-400">Book Progress</p>
-                        <span id="progress-text" class="text-xs font-medium text-slate-300">0%</span>
-                    </div>
-                    <div class="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
-                        <div id="read-progress-bar" class="bg-slate-400 h-full rounded-full w-[0%]"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Gesture Control Area -->
-        <div class="p-6 bg-slate-900 mt-auto">
-            <h3 class="text-xs font-bold text-slate-400 tracking-widest uppercase mb-4 flex items-center gap-2">
-                <i class="ph ph-hand-waving"></i> Gesture Control
-            </h3>
-            
-            <div id="webcam-container" class="w-full aspect-video rounded-xl border border-slate-700 webcam-feed flex flex-col items-center justify-center cursor-pointer hover:border-slate-500 transition-colors group relative overflow-hidden" onclick="simulateGesture()">
-                <!-- Live Video Feed -->
-                <video id="webcam-video" class="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-300 z-0" style="transform: scaleX(-1);" autoplay playsinline muted></video>
-
-                <!-- Status Overlay -->
-                <div id="webcam-overlay" class="relative z-10 flex flex-col items-center justify-center pointer-events-none transition-all">
-                    <i id="camera-icon" class="ph ph-video-camera-slash text-3xl text-slate-600 mb-2 group-hover:text-slate-400 transition-colors"></i>
-                    <span id="camera-status-text" class="text-xs text-slate-500 font-medium group-hover:text-slate-400 text-center px-2">Camera inactive</span>
-                    <div id="gesture-status" class="hidden mt-2 px-3 py-1 bg-slate-800/80 rounded-full border border-slate-600 text-[10px] uppercase tracking-wider font-bold text-slate-300 transition-colors">
-                        Initializing...
-                    </div>
-                </div>
-                
-                <!-- Fake tracking dots -->
-                <div id="tracking-dots" class="absolute inset-0 hidden pointer-events-none opacity-50 z-20">
-                    <div class="absolute top-1/2 left-1/2 w-2 h-2 bg-indigo-500 rounded-full shadow-[0_0_8px_#6366f1]"></div>
-                    <div class="absolute top-[40%] left-[45%] w-1 h-1 bg-indigo-400 rounded-full"></div>
-                    <div class="absolute top-[35%] left-[55%] w-1 h-1 bg-indigo-400 rounded-full"></div>
-                </div>
+        <!-- Gesture Panel -->
+        <div class="mt-auto">
+            <div class="text-sm font-semibold text-slate-200 mb-3 flex justify-between items-center">
+                <span>Gesture Controls</span>
             </div>
             
-            <div class="mt-3 flex items-center justify-between">
-                <button id="enable-camera-btn" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
-                    Enable Camera
+            <div id="webcam-container" class="relative w-full aspect-video bg-slate-800 rounded-xl overflow-hidden border-2 border-slate-700 transition-colors">
+                <button id="enable-camera-btn" class="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-slate-800 hover:bg-slate-700 transition z-10">
+                    <span class="text-2xl mb-2">📷</span>
+                    <span class="text-sm font-medium text-center px-4">Enable Camera<br><span class="text-xs text-slate-400 font-normal">for touch-free controls</span></span>
                 </button>
-                <span class="text-[10px] text-slate-500">(Click box to sim)</span>
+                <video id="webcam-video" class="absolute inset-0 w-full h-full object-cover hidden -scale-x-100" autoplay playsinline></video>
             </div>
+            
+            <!-- Status text -->
+            <div class="mt-3 flex items-center justify-center gap-2">
+                <div id="pulse-dot" class="w-2 h-2 rounded-full bg-slate-600 transition-colors"></div>
+                <span id="gesture-status" class="text-sm text-slate-400 font-medium">Camera inactive</span>
+            </div>
+        </div>
+        
+        <!-- Controls reference -->
+        <div class="bg-slate-800/30 rounded-xl p-4 text-xs text-slate-400 space-y-2 mt-4 border border-slate-800">
+            <p>✋ <b>Pause/Resume</b> (hold)</p>
+            <p>☝️ <b>Rewind</b> (hold)</p>
+            <p>👍 <b>Faster</b> / ✊ <b>Slower</b></p>
         </div>
     </aside>
 
     <!-- Main Reading Area -->
-    <main class="flex-1 relative flex flex-col bg-[#0b1120]">
+    <main class="flex-1 flex flex-col relative h-full bg-[#0B1121]">
         
-        <!-- Top and Bottom gradient fades for smooth scrolling effect -->
-        <div class="absolute top-0 w-full h-32 fade-top z-10 pointer-events-none"></div>
-        <div class="absolute bottom-0 w-full h-40 fade-bottom z-10 pointer-events-none"></div>
-
-        <!-- Scrollable Book Container -->
-        <div id="scroll-container" class="flex-1 overflow-y-auto relative">
-            <!-- Padded reading area -->
-            <div class="max-w-4xl mx-auto px-12 py-[40vh]">
-                
-                <article id="book-content" class="reading-font text-[2.5rem] leading-[2.2] text-slate-300 font-light tracking-wide transition-all duration-300">
-                    <p class="mb-10 text-slate-500 font-sans text-xl uppercase tracking-widest font-bold">Chapter 1</p>
-                    
-                    <p class="mb-12">In my younger and more vulnerable years my father gave me some advice that I've been turning over in my mind ever since.</p>
-                    
-                    <p class="mb-12">"Whenever you feel like criticizing any one," he told me, "just remember that all the people in this world haven't had the advantages that you've had."</p>
-                    
-                    <p class="mb-12">He didn't say any more, but we've always been unusually communicative in a reserved way, and I understood that he meant a great deal more than that. In consequence, I'm inclined to reserve all judgments, a habit that has opened up many curious natures to me and also made me the victim of not a few veteran bores.</p>
-                    
-                    <p class="mb-12">The abnormal mind is quick to detect and attach itself to this quality when it appears in a normal person, and so it came about that in college I was unjustly accused of being a politician, because I was privy to the secret griefs of wild, unknown men.</p>
-                    
-                    <p class="mb-12">Most of the confidences were unsought—frequently I have feigned sleep, preoccupation, or a hostile levity when I realized by some unmistakable sign that an intimate revelation was quivering on the horizon; for the intimate revelations of young men, or at least the terms in which they express them, are usually plagiaristic and marred by obvious suppressions.</p>
-                    
-                    <p class="mb-12">Reserving judgments is a matter of infinite hope. I am still a little afraid of missing something if I forget that, as my father snobbishly suggested, and I snobbishly repeat, a sense of the fundamental decencies is parcelled out unequally at birth.</p>
-
-                    <p class="mb-12">And, after boasting this way of my tolerance, I come to the admission that it has a limit. Conduct may be founded on the hard rock or the wet marshes, but after a certain point I don't care what it's founded on.</p>
-
-                    <p class="mb-12">When I came back from the East last autumn I felt that I wanted the world to be in uniform and at a sort of moral attention forever; I wanted no more riotous excursions with privileged glimpses into the human heart.</p>
-
-                    <p class="mb-12">Only Gatsby, the man who gives his name to this book, was exempt from my reaction—Gatsby, who represented everything for which I have an unaffected scorn.</p>
-
-                    <p class="mb-12">If personality is an unbroken series of successful gestures, then there was something gorgeous about him, some heightened sensitivity to the promises of life, as if he were related to one of those intricate machines that register earthquakes ten thousand miles away.</p>
-                    
-                    <p class="mb-32 text-center text-slate-600 font-sans text-xl">***</p>
-                </article>
+        <!-- Top bar: Book Info -->
+        <header class="h-20 shrink-0 flex items-center justify-between px-12 border-b border-slate-800/50 bg-slate-900/20 backdrop-blur-sm z-10">
+            <div>
+                <h2 class="text-lg font-semibold text-slate-200">The Great Gatsby</h2>
+                <p class="text-sm text-slate-500">Chapter 1</p>
             </div>
-        </div>
-
-        <!-- Floating Controls -->
-        <div class="absolute bottom-10 left-1/2 -translate-x-1/2 glass-panel rounded-full px-8 py-4 flex items-center gap-8 z-20 shadow-2xl transition-transform hover:scale-105">
             
-            <!-- Text Size Controls -->
-            <div class="flex items-center gap-3">
-                <button onclick="changeTextSize(-0.25)" class="w-10 h-10 rounded-full bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-white transition-colors" title="Decrease Text Size (Left Arrow)">
-                    <i class="ph ph-text-aa text-sm"></i>
-                </button>
-                <div class="flex flex-col items-center w-12">
-                    <span class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Size</span>
-                    <span id="size-indicator" class="text-sm font-semibold text-white">2.5</span>
-                </div>
-                <button onclick="changeTextSize(0.25)" class="w-10 h-10 rounded-full bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-white transition-colors" title="Increase Text Size (Right Arrow)">
-                    <i class="ph ph-text-aa text-lg"></i>
-                </button>
+            <!-- Manual Controls (Top right) -->
+            <div class="flex items-center gap-2">
+                <button onclick="window.changeTextSize(-1)" class="w-10 h-10 rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700 flex items-center justify-center text-lg transition">A-</button>
+                <button onclick="window.changeTextSize(1)" class="w-10 h-10 rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700 flex items-center justify-center text-lg transition">A+</button>
             </div>
+        </header>
 
-            <div class="w-px h-8 bg-slate-600/50"></div>
+        <!-- Gesture Feedback Overlay (Subtle pill style) -->
+        <div id="gesture-overlay" class="absolute top-12 left-1/2 -translate-x-1/2 bg-slate-800/95 backdrop-blur-md rounded-full px-6 py-3 flex items-center gap-3 opacity-0 pointer-events-none z-50 transition-all duration-300 shadow-2xl border border-white/10 transform -translate-y-4">
+            <span id="gesture-emoji" class="text-2xl drop-shadow-sm">✋</span>
+            <span id="gesture-text" class="text-sm font-bold tracking-[0.15em] text-slate-200 uppercase">PAUSED</span>
+        </div>
 
-            <!-- Play / Pause -->
-            <button id="play-btn" onclick="togglePlay()" class="w-16 h-16 rounded-full bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center text-white shadow-[0_0_20px_rgba(79,70,229,0.4)] transition-all transform hover:scale-110 active:scale-95" title="Play / Pause (Spacebar)">
-                <i id="play-icon" class="ph-fill ph-play text-2xl ml-1"></i>
-            </button>
-
-            <div class="w-px h-8 bg-slate-600/50"></div>
-
-            <!-- Speed Controls -->
-            <div class="flex items-center gap-3">
-                <button onclick="changeSpeed(-0.5)" class="w-10 h-10 rounded-full bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-white transition-colors" title="Decrease Speed (Down Arrow)">
-                    <i class="ph ph-minus"></i>
-                </button>
-                <div class="flex flex-col items-center w-12">
-                    <span class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Speed</span>
-                    <span id="speed-indicator" class="text-sm font-semibold text-white">1.0x</span>
-                </div>
-                <button onclick="changeSpeed(0.5)" class="w-10 h-10 rounded-full bg-slate-700/50 hover:bg-slate-600 flex items-center justify-center text-white transition-colors" title="Increase Speed (Up Arrow)">
-                    <i class="ph ph-plus"></i>
-                </button>
+        <!-- Reading Content (Scrollable) -->
+        <div id="scroll-container" class="flex-1 overflow-y-auto px-12 py-16">
+            <div class="max-w-3xl mx-auto book-text text-3xl leading-relaxed text-slate-300 space-y-8 pb-[50vh]">
+                <p>In my younger and more vulnerable years my father gave me some advice that I've been turning over in my mind ever since.</p>
+                <p>"Whenever you feel like criticizing any one," he told me, "just remember that all the people in this world haven't had the advantages that you've had."</p>
+                <p>He didn't say any more, but we've always been unusually communicative in a reserved way, and I understood that he meant a great deal more than that. In consequence, I'm inclined to reserve all judgments, a habit that has opened up many curious natures to me and also made me the victim of not a few veteran bores.</p>
+                <p>The abnormal mind is quick to detect and attach itself to this quality when it appears in a normal person, and so it came about that in college I was unjustly accused of being a politician, because I was privy to the secret griefs of wild, unknown men.</p>
+                <p>Most of the confidences were unsought — frequently I have feigned sleep, preoccupation, or a hostile levity when I realized by some unmistakable sign that an intimate revelation was quivering on the horizon; for the intimate revelations of young men, or at least the terms in which they express them, are usually plagiaristic and marred by obvious suppressions.</p>
+                <p>Reserving judgments is a matter of infinite hope. I am still a little afraid of missing something if I forget that, as my father snobbishly suggested, and I snobbishly repeat, a sense of the fundamental decencies is parcelled out unequally at birth.</p>
+                <p>And, after boasting this way of my tolerance, I come to the admission that it has a limit. Conduct may be founded on the hard rock or the wet marshes, but after a certain point I don't care what it's founded on. When I came back from the East last autumn I felt that I wanted the world to be in uniform and at a sort of moral attention forever; I wanted no more riotous excursions with privileged glimpses into the human heart.</p>
+                <p>Only Gatsby, the man who gives his name to this book, was exempt from my reaction — Gatsby, who represented everything for which I have an unaffected scorn. If personality is an unbroken series of successful gestures, then there was something gorgeous about him, some heightened sensitivity to the promises of life, as if he were related to one of those intricate machines that register earthquakes ten thousand miles away.</p>
+                <p>This responsiveness had nothing to do with that flabby impressionability which is dignified under the name of the "creative temperament." — it was an extraordinary gift for hope, a romantic readiness such as I have never found in any other person and which it is not likely I shall ever find again.</p>
+                <p>No — Gatsby turned out all right at the end; it is what preyed on Gatsby, what foul dust floated in the wake of his dreams that temporarily closed out my interest in the abortive sorrows and short-winded elations of men.</p>
+                
+                <!-- Extra content to ensure scroll behavior is noticeable -->
+                <p>My family have been prominent, well-to-do people in this Middle Western city for three generations. The Carraways are something of a clan, and we have a tradition that we're descended from the Dukes of Buccleuch, but the actual founder of my line was my grandfather's brother, who came here in fifty-one, sent a substitute to the Civil War, and started the wholesale hardware business that my father carries on to-day.</p>
+                <p>I never saw this great-uncle, but I'm supposed to look like him — with special reference to the rather hard-boiled painting that hangs in father's office I graduated from New Haven in 1915, just a quarter of a century after my father, and a little later I participated in that delayed Teutonic migration known as the Great War. I enjoyed the counter-raid so thoroughly that I came back restless.</p>
+                <p>Instead of being the warm centre of the world, the Middle West now seemed like the ragged edge of the universe — so I decided to go East and learn the bond business. Everybody I knew was in the bond business, so I supposed it could support one more single man. All my aunts and uncles talked it over as if they were choosing a prep school for me, and finally said, "Why — ye — es," with very grave, hesitant faces.</p>
+                <p>Father agreed to finance me for a year, and after various delays I came East, permanently, I thought, in the spring of twenty-two. The practical thing was to find rooms in the city, but it was a warm season, and I had just left a country of wide lawns and friendly trees, so when a young man at the office suggested that we take a house together in a commuting town, it sounded like a great idea.</p>
+                <p>He found the house, a weather-beaten cardboard bungalow at eighty a month, but at the last minute the firm ordered him to Washington, and I went out to the country alone.</p>
             </div>
         </div>
 
-        <!-- Gesture Feedback Overlay (Hidden by default) -->
-        <div id="gesture-overlay" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 glass-panel rounded-3xl p-10 flex flex-col items-center opacity-0 scale-90 pointer-events-none z-50 transition-all duration-300 shadow-2xl border border-white/20">
-            <span id="gesture-emoji" class="text-7xl mb-4 drop-shadow-lg">✋</span>
-            <span id="gesture-text" class="text-2xl font-bold tracking-[0.2em] text-white">PAUSED</span>
-        </div>
+        <!-- Bottom Progress & Manual Controls Bar -->
+        <footer class="h-24 shrink-0 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-8 relative z-20 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+            <!-- Progress Bar Background -->
+            <div class="absolute top-0 left-0 w-full h-1 bg-slate-800">
+                <div id="progress-bar" class="h-full bg-indigo-500 w-0 transition-all duration-300"></div>
+            </div>
 
+            <div class="flex items-center gap-6">
+                <button onclick="window.togglePlay()" class="w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center text-2xl shadow-lg transition transform hover:scale-105">
+                    <span id="play-icon" class="ml-1">▶️</span>
+                    <span id="pause-icon" class="hidden">⏸️</span>
+                </button>
+                
+                <div class="flex items-center gap-4 bg-slate-800/80 rounded-full px-2 py-2">
+                    <button onclick="window.changeSpeed(-0.5)" class="w-10 h-10 rounded-full hover:bg-slate-700 text-slate-300 flex items-center justify-center transition">✊</button>
+                    <!-- Added a distinct ID to the container for the pulse animation -->
+                    <div id="speed-container" class="w-16 text-center font-mono font-bold text-slate-200 rounded-lg">
+                        <span id="speed-indicator" class="inline-block px-2 py-1 rounded">1.0x</span>
+                    </div>
+                    <button onclick="window.changeSpeed(0.5)" class="w-10 h-10 rounded-full hover:bg-slate-700 text-slate-300 flex items-center justify-center transition">👍</button>
+                </div>
+            </div>
+            
+            <div class="text-right text-slate-500 text-sm">
+                <p>Avg Pace: <span class="text-slate-300">Medium</span></p>
+            </div>
+        </footer>
     </main>
 
-    <script>
-        // State
-        let isPlaying = false;
-        let isRewinding = false;
-        let scrollSpeed = 1.0; // pixels per frame multiplier
-        let baseScrollRate = 1.0; // baseline pixel scroll per frame
-        let textSizeRem = 2.5; 
-        let animationFrameId = null;
+    <script type="module">
+        import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm";
 
         // DOM Elements
         const scrollContainer = document.getElementById('scroll-container');
-        const bookContent = document.getElementById('book-content');
-        const playBtn = document.getElementById('play-btn');
         const playIcon = document.getElementById('play-icon');
+        const pauseIcon = document.getElementById('pause-icon');
+        const speedContainer = document.getElementById('speed-container');
         const speedIndicator = document.getElementById('speed-indicator');
-        const sizeIndicator = document.getElementById('size-indicator');
-        const progressBar = document.getElementById('read-progress-bar');
-        const progressText = document.getElementById('progress-text');
+        const progressBar = document.getElementById('progress-bar');
         
-        // Gesture Feedback Elements
         const gestureOverlay = document.getElementById('gesture-overlay');
         const gestureEmoji = document.getElementById('gesture-emoji');
         const gestureText = document.getElementById('gesture-text');
-        const webcamContainer = document.getElementById('webcam-container');
-        const trackingDots = document.getElementById('tracking-dots');
         
-        // Webcam Elements
         const webcamVideo = document.getElementById('webcam-video');
         const enableCameraBtn = document.getElementById('enable-camera-btn');
-        const cameraIcon = document.getElementById('camera-icon');
-        const cameraStatusText = document.getElementById('camera-status-text');
-        const webcamOverlay = document.getElementById('webcam-overlay');
         const gestureStatus = document.getElementById('gesture-status');
+        const pulseDot = document.getElementById('pulse-dot');
+        const webcamContainer = document.getElementById('webcam-container');
 
+        // Reading State
+        let isPlaying = false;
+        let scrollSpeed = 1.0;
+        let isRewinding = false;
+        let isIncreasingSpeed = false;
+        let isDecreasingSpeed = false;
+        
         // MediaPipe State
-        let handLandmarker = null;
-        let isMediaPipeInitializing = false;
-        let trackingAnimationFrame = null;
+        let handLandmarker = undefined;
+        let webcamRunning = false;
         let lastVideoTime = -1;
-        const baseGestureClasses = "mt-2 px-3 py-1 rounded-full border text-[10px] uppercase tracking-wider font-bold transition-colors";
 
-        // Gesture State Machine
-        let currentGesture = 'NONE';
-        let pendingGesture = 'NONE';
-        let pendingGestureTime = 0;
-        let gestureHoldStart = 0;
+        // Gesture Processing State
+        let currentGesture = null;
+        let gestureStartTime = 0;
         let gestureActionFired = false;
-        const GESTURE_DEBOUNCE_MS = 150; // Tolerates tracking flicker while running
+        let activeBriefFeedback = false;
+        let feedbackTimeout = null;
+        
+        // Tolerance / Debounce State
+        let lastRawGesture = null;
+        let lastRawGestureTime = Date.now();
 
-        // Initial setup
-        updateUI();
+        function updateOverlayUI(text, emoji, isBounce) {
+            gestureText.innerText = text;
+            gestureEmoji.innerText = emoji;
+            
+            gestureOverlay.classList.remove('opacity-0', '-translate-y-4');
+            gestureOverlay.classList.add('opacity-100', 'translate-y-0');
+            
+            if (isBounce) {
+                gestureOverlay.classList.add('animate-gentle-bounce');
+            } else {
+                gestureOverlay.classList.remove('animate-gentle-bounce');
+            }
+        }
 
-        // Core Scrolling Loop
-        function scrollLoop() {
+        function hideOverlayUI() {
+            gestureOverlay.classList.add('opacity-0', '-translate-y-4');
+            gestureOverlay.classList.remove('opacity-100', 'translate-y-0');
+            gestureOverlay.classList.remove('animate-gentle-bounce');
+        }
+
+        // Determines what the permanent background state should be
+        function evaluateOverlayState() {
+            if (activeBriefFeedback) return;
+
             if (isRewinding) {
-                // Continuous backward scrolling (rewind)
-                const rewindStep = baseScrollRate * Math.max(scrollSpeed, 2.0) * 4.0;
-                scrollContainer.scrollTop -= rewindStep;
-                updateReadingProgress();
-            } else if (isPlaying) {
-                // Determine step size based on speed
-                // 1.0x speed = 1px per frame (approx 60px/sec on 60hz)
-                const step = baseScrollRate * scrollSpeed;
-                
-                scrollContainer.scrollTop += step;
-                
-                updateReadingProgress();
-
-                // Stop if we hit the bottom
-                if (scrollContainer.scrollTop + scrollContainer.clientHeight >= scrollContainer.scrollHeight - 2) {
-                    togglePlay(false);
-                }
-            }
-            animationFrameId = requestAnimationFrame(scrollLoop);
-        }
-
-        // Start the loop
-        animationFrameId = requestAnimationFrame(scrollLoop);
-
-        // Control Functions
-        function togglePlay(forceState = null) {
-            if (forceState !== null) {
-                isPlaying = forceState;
+                updateOverlayUI('REWINDING', '↩️', true);
+            } else if (isIncreasingSpeed) {
+                updateOverlayUI(`FASTER (${scrollSpeed.toFixed(1)}x)`, '👍', false);
+            } else if (isDecreasingSpeed) {
+                updateOverlayUI(`SLOWER (${scrollSpeed.toFixed(1)}x)`, '✊', false);
+            } else if (!isPlaying) {
+                updateOverlayUI('PAUSED', '✋', false);
             } else {
-                isPlaying = !isPlaying;
+                hideOverlayUI();
             }
+        }
+        
+        // Temporarily interrupts the overlay to show brief actions (e.g., Resumed)
+        function showGestureFeedback(text, emoji) {
+            clearTimeout(feedbackTimeout);
+
+            // If it's a persistent state, let the main evaluator handle it
+            if (text === 'PAUSED' || text === 'REWINDING') {
+                activeBriefFeedback = false;
+                evaluateOverlayState();
+                return;
+            }
+
+            activeBriefFeedback = true;
+            updateOverlayUI(text, emoji, false);
             
-            updateUI();
+            // Wait slightly over 1s, then revert to background state
+            feedbackTimeout = setTimeout(() => {
+                activeBriefFeedback = false;
+                evaluateOverlayState();
+            }, 1200); 
         }
 
-        function changeSpeed(delta) {
-            let newSpeed = scrollSpeed + delta;
-            // Clamp speed between 0.5x and 4.0x
-            newSpeed = Math.max(0.5, Math.min(newSpeed, 4.0));
-            scrollSpeed = newSpeed;
-            updateUI();
-        }
-
-        function changeTextSize(delta) {
-            let newSize = textSizeRem + delta;
-            // Clamp size between 1.5rem and 5.0rem
-            newSize = Math.max(1.5, Math.min(newSize, 5.0));
-            textSizeRem = newSize;
-            
-            // Apply size
-            bookContent.style.fontSize = `${textSizeRem}rem`;
-            // Adjust line height dynamically based on size
-            bookContent.style.lineHeight = textSizeRem < 3 ? '2.0' : '1.8';
-            
-            updateUI();
-        }
-
-        // UI Updates
         function updateUI() {
-            // Play/Pause button
             if (isPlaying) {
-                playBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-500');
-                playBtn.classList.add('bg-slate-700', 'hover:bg-slate-600', 'shadow-none');
-                playIcon.classList.remove('ph-play', 'ml-1');
-                playIcon.classList.add('ph-pause');
+                playIcon.classList.add('hidden');
+                pauseIcon.classList.remove('hidden');
             } else {
-                playBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-500');
-                playBtn.classList.remove('bg-slate-700', 'hover:bg-slate-600', 'shadow-none');
-                playIcon.classList.remove('ph-pause');
-                playIcon.classList.add('ph-play', 'ml-1');
+                playIcon.classList.remove('hidden');
+                pauseIcon.classList.add('hidden');
             }
-
-            // Indicators
-            speedIndicator.innerText = `${scrollSpeed.toFixed(1)}x`;
-            sizeIndicator.innerText = `${textSizeRem.toFixed(1)}`;
+            speedIndicator.innerText = scrollSpeed.toFixed(1) + 'x';
         }
 
-        function updateReadingProgress() {
-            const scrollTop = scrollContainer.scrollTop;
-            const scrollHeight = scrollContainer.scrollHeight;
-            const clientHeight = scrollContainer.clientHeight;
+        function scrollLoop() {
+            // Centralized scroll movement
+            if (isRewinding) {
+                scrollContainer.scrollTop -= (scrollSpeed * 1.5); // Smooth, slow rewind (~30% of old speed)
+            } else if (isPlaying) {
+                scrollContainer.scrollTop += (scrollSpeed * 0.8);
+            }
             
-            // Calculate percentage
-            // Ensure we don't divide by zero
-            if (scrollHeight <= clientHeight) return;
+            // Continuous smooth speed adjustments (applies every frame while gesture is held)
+            if (isIncreasingSpeed) {
+                scrollSpeed = Math.min(4.0, scrollSpeed + 0.01);
+                updateUI();
+                evaluateOverlayState(); // Refresh dynamic text
+            } else if (isDecreasingSpeed) {
+                scrollSpeed = Math.max(0.5, scrollSpeed - 0.01);
+                updateUI();
+                evaluateOverlayState(); // Refresh dynamic text
+            }
             
-            let percent = (scrollTop / (scrollHeight - clientHeight)) * 100;
-            percent = Math.min(100, Math.max(0, percent));
+            // Update progress bar
+            const scrollHeight = scrollContainer.scrollHeight - scrollContainer.clientHeight;
+            if (scrollHeight > 0) {
+                progressBar.style.width = `${(scrollContainer.scrollTop / scrollHeight) * 100}%`;
+            }
             
-            progressBar.style.width = `${percent}%`;
-            progressText.innerText = `${Math.round(percent)}%`;
+            requestAnimationFrame(scrollLoop);
         }
+        
+        // Start the single central scroll loop
+        requestAnimationFrame(scrollLoop);
+        updateUI();
+        evaluateOverlayState();
 
-        // Keyboard Controls
+        // Manual controls overrides
+        window.togglePlay = function(forceState = null) {
+            isPlaying = forceState !== null ? forceState : !isPlaying;
+            updateUI();
+            evaluateOverlayState();
+        };
+
+        window.changeSpeed = function(delta) {
+            scrollSpeed = Math.max(0.5, Math.min(scrollSpeed + delta, 4.0));
+            updateUI();
+            
+            speedContainer.classList.remove('pulse-speed-anim');
+            void speedContainer.offsetWidth; 
+            speedContainer.classList.add('pulse-speed-anim');
+        };
+
+        window.changeTextSize = function(delta) {
+            const content = scrollContainer.firstElementChild;
+            if (content) {
+                const currentSize = parseFloat(window.getComputedStyle(content).fontSize);
+                content.style.fontSize = `${currentSize + (delta * 4)}px`;
+            }
+        };
+
         window.addEventListener('keydown', (e) => {
-            // Prevent default scrolling for arrows and space
             if(["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].indexOf(e.code) > -1) {
                 e.preventDefault();
             }
-
             switch(e.code) {
                 case 'Space':
-                    togglePlay();
-                    showGestureFeedback(isPlaying ? 'PLAY' : 'PAUSED', isPlaying ? '▶️' : '✋');
+                    window.togglePlay();
+                    showGestureFeedback(isPlaying ? 'RESUMED' : 'PAUSED', isPlaying ? '▶️' : '✋');
                     break;
                 case 'ArrowUp':
-                    changeSpeed(0.5);
-                    showGestureFeedback('FASTER', '☝️');
+                    window.changeSpeed(0.5);
+                    showGestureFeedback(`FASTER (${scrollSpeed.toFixed(1)}x)`, '👍');
                     break;
                 case 'ArrowDown':
-                    changeSpeed(-0.5);
-                    showGestureFeedback('SLOWER', '👇');
-                    break;
-                case 'ArrowRight':
-                    changeTextSize(0.25);
-                    break;
-                case 'ArrowLeft':
-                    changeTextSize(-0.25);
+                    window.changeSpeed(-0.5);
+                    showGestureFeedback(`SLOWER (${scrollSpeed.toFixed(1)}x)`, '✊');
                     break;
             }
         });
 
-        // Ensure progress is updated on manual wheel scroll too
-        scrollContainer.addEventListener('scroll', updateReadingProgress);
-
-        // Gesture Feedback Simulator
-        let feedbackTimeout;
-        
-        function showGestureFeedback(text, emoji) {
-            gestureText.innerText = text;
-            gestureEmoji.innerText = emoji;
-            
-            gestureOverlay.classList.remove('opacity-0', 'scale-90');
-            gestureOverlay.classList.add('opacity-100', 'scale-100');
-            
-            clearTimeout(feedbackTimeout);
-            feedbackTimeout = setTimeout(() => {
-                gestureOverlay.classList.add('opacity-0', 'scale-90');
-                gestureOverlay.classList.remove('opacity-100', 'scale-100');
-            }, 1000);
-        }
-
-        // Simulate a gesture from the webcam box for demo purposes
-        function simulateGesture() {
-            // Only simulate if camera is NOT active
-            if (webcamVideo.srcObject) return;
-
-            // Activate "tracking" look
-            webcamContainer.classList.add('border-indigo-500');
-            trackingDots.classList.remove('hidden');
-            
-            setTimeout(() => {
-                webcamContainer.classList.remove('border-indigo-500');
-                trackingDots.classList.add('hidden');
-                
-                // Perform action (Pause/Play)
-                togglePlay();
-                showGestureFeedback(isPlaying ? 'PLAY' : 'PAUSED', isPlaying ? '👌' : '✋');
-            }, 600);
-        }
-
-        // MediaPipe Initialization and Tracking
-        async function initMediaPipe() {
-            if (handLandmarker || isMediaPipeInitializing) return;
-            isMediaPipeInitializing = true;
+        async function initializeHandLandmarker() {
+            gestureStatus.innerText = "Initializing AI...";
+            pulseDot.classList.add('bg-yellow-500', 'animate-pulse');
             
             try {
-                // Dynamically import MediaPipe Tasks Vision using the ES module endpoint
-                const module = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm');
-                const FilesetResolver = module.FilesetResolver;
-                const HandLandmarker = module.HandLandmarker;
-                
                 const vision = await FilesetResolver.forVisionTasks(
                     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
                 );
-                
                 handLandmarker = await HandLandmarker.createFromOptions(vision, {
                     baseOptions: {
-                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+                        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
                         delegate: "GPU"
                     },
                     runningMode: "VIDEO",
                     numHands: 1
                 });
-                
-                gestureStatus.innerText = 'No hand detected';
-                gestureStatus.className = `${baseGestureClasses} bg-slate-800/80 border-slate-600 text-slate-300`;
+                gestureStatus.innerText = "Camera active";
+                pulseDot.classList.remove('bg-yellow-500');
+                pulseDot.classList.add('bg-emerald-500');
             } catch (error) {
-                console.error("MediaPipe initialization failed:", error);
-                gestureStatus.innerText = 'Error loading AI';
-                gestureStatus.className = `${baseGestureClasses} bg-red-900/50 border-red-500/50 text-red-300`;
+                console.error("AI Init Error:", error);
+                gestureStatus.innerText = "AI Failed to load";
+                pulseDot.classList.remove('bg-yellow-500', 'animate-pulse');
+                pulseDot.classList.add('bg-red-500');
             }
         }
 
-        function isFingerExtended(landmarks, tipIdx, mcpIdx, wristIdx) {
-            const tip = landmarks[tipIdx];
-            const mcp = landmarks[mcpIdx];
-            const wrist = landmarks[wristIdx];
-            
-            // Calculate 2D distance from wrist
-            const distTip = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
-            const distMcp = Math.hypot(mcp.x - wrist.x, mcp.y - wrist.y);
-            
-            // Finger is extended if tip is significantly further from wrist than the MCP joint
-            return distTip > distMcp * 1.25;
-        }
-
-        function processHandResults(results) {
-            if (!results.landmarks || results.landmarks.length === 0) {
-                gestureStatus.innerText = 'No hand detected';
-                gestureStatus.className = `${baseGestureClasses} bg-slate-800/80 border-slate-600 text-slate-300`;
-                
-                // Reset state machine immediately on hand loss
-                currentGesture = 'NONE';
-                pendingGesture = 'NONE';
-                gestureActionFired = false;
-                isRewinding = false;
-                return;
-            }
-
-            const landmarks = results.landmarks[0]; // Track the first detected hand
-            
-            // Check extension of 4 main fingers
-            const indexExt = isFingerExtended(landmarks, 8, 5, 0);
-            const middleExt = isFingerExtended(landmarks, 12, 9, 0);
-            const ringExt = isFingerExtended(landmarks, 16, 13, 0);
-            const pinkyExt = isFingerExtended(landmarks, 20, 17, 0);
-            
-            // Detect raw gesture
-            let detectedGesture = 'NONE';
-            if (indexExt && middleExt && ringExt && pinkyExt) {
-                detectedGesture = 'OPEN_PALM';
-            } else if (indexExt && !middleExt && !ringExt && !pinkyExt) {
-                detectedGesture = 'POINT_UP';
-            } else if (!indexExt && !middleExt && !ringExt && !pinkyExt) {
-                // Determine if thumb is sticking up (y coordinate is smaller) compared to index MCP
-                const isThumbStickingUp = landmarks[4].y < landmarks[5].y - 0.08;
-                if (isThumbStickingUp) {
-                    detectedGesture = 'THUMBS_UP';
-                } else {
-                    detectedGesture = 'FIST';
-                }
-            }
-            
-            // Debounce state machine (for runner stability)
-            if (detectedGesture !== currentGesture) {
-                if (detectedGesture !== pendingGesture) {
-                    pendingGesture = detectedGesture;
-                    pendingGestureTime = Date.now();
-                } else if (Date.now() - pendingGestureTime > GESTURE_DEBOUNCE_MS) {
-                    currentGesture = detectedGesture;
-                    gestureHoldStart = Date.now();
-                    gestureActionFired = false;
-                }
-            } else {
-                pendingGesture = currentGesture; // Keep pending in sync
-            }
-
-            // Apply behaviors based on stable current gesture
-            let state = "Hand detected";
-            let activeClass = 'bg-slate-700/80 border-slate-500 text-slate-200';
-            
-            const holdTime = Date.now() - gestureHoldStart;
-
-            switch (currentGesture) {
-                case 'OPEN_PALM':
-                    if (holdTime >= 500 && !gestureActionFired) {
-                        togglePlay();
-                        gestureActionFired = true;
-                        showGestureFeedback(isPlaying ? 'PLAY' : 'PAUSED', isPlaying ? '▶️' : '✋');
-                    }
-                    if (gestureActionFired) {
-                        state = isPlaying ? "▶️ Resumed" : "✋ Paused";
-                        activeClass = 'bg-indigo-900/80 border-indigo-500 text-indigo-300 shadow-[0_0_10px_rgba(99,102,241,0.3)]';
-                    } else {
-                        state = "Open palm";
-                        activeClass = 'bg-green-900/80 border-green-500 text-green-300 shadow-[0_0_10px_rgba(34,197,94,0.3)]';
-                    }
-                    break;
-                    
-                case 'THUMBS_UP':
-                    if (holdTime >= 500 && !gestureActionFired) {
-                        changeSpeed(0.5);
-                        gestureActionFired = true;
-                        showGestureFeedback('FASTER', '👍');
-                    }
-                    if (gestureActionFired) {
-                        state = "👍 Faster";
-                        activeClass = 'bg-indigo-900/80 border-indigo-500 text-indigo-300 shadow-[0_0_10px_rgba(99,102,241,0.3)]';
-                    } else {
-                        state = "Thumbs up";
-                        activeClass = 'bg-green-900/80 border-green-500 text-green-300 shadow-[0_0_10px_rgba(34,197,94,0.3)]';
-                    }
-                    break;
-                    
-                case 'FIST':
-                    if (holdTime >= 500 && !gestureActionFired) {
-                        changeSpeed(-0.5);
-                        gestureActionFired = true;
-                        showGestureFeedback('SLOWER', '✊');
-                    }
-                    if (gestureActionFired) {
-                        state = "✊ Slower";
-                        activeClass = 'bg-indigo-900/80 border-indigo-500 text-indigo-300 shadow-[0_0_10px_rgba(99,102,241,0.3)]';
-                    } else {
-                        state = "Fist";
-                        activeClass = 'bg-green-900/80 border-green-500 text-green-300 shadow-[0_0_10px_rgba(34,197,94,0.3)]';
-                    }
-                    break;
-                    
-                case 'POINT_UP':
-                    if (holdTime >= 200 && !gestureActionFired) {
-                        // Show the large central overlay once when the rewind starts
-                        showGestureFeedback('REWIND', '↩️');
-                        gestureActionFired = true; 
-                    }
-                    
-                    isRewinding = true;
-                    
-                    state = "↩ Rewind";
-                    activeClass = 'bg-indigo-900/80 border-indigo-500 text-indigo-300 shadow-[0_0_10px_rgba(99,102,241,0.3)]';
-                    break;
-            }
-            
-            // Clear rewind state if hand is doing something else
-            if (currentGesture !== 'POINT_UP') {
-                isRewinding = false;
-            }
-            
-            gestureStatus.innerText = state;
-            gestureStatus.className = `${baseGestureClasses} ${activeClass}`;
-        }
-        
-        async function trackingLoop() {
-            // Stop if camera was disabled
-            if (!webcamVideo.srcObject) return;
-
-            // Wait for video to be ready and model to be loaded
-            if (handLandmarker && webcamVideo.readyState >= 2) {
-                let startTimeMs = performance.now();
-                if (lastVideoTime !== webcamVideo.currentTime) {
-                    lastVideoTime = webcamVideo.currentTime;
-                    // Detect hands in the current video frame
-                    const results = handLandmarker.detectForVideo(webcamVideo, startTimeMs);
-                    processHandResults(results);
-                }
-            }
-            
-            // Loop
-            trackingAnimationFrame = requestAnimationFrame(trackingLoop);
-        }
-        
-        // Real Webcam Integration
         enableCameraBtn.addEventListener('click', async () => {
-            if (enableCameraBtn.innerText === 'Enable Camera') {
-                try {
-                    // Check if API is supported
-                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                        throw new Error('Browser API not supported');
-                    }
-
-                    // Loading State
-                    cameraStatusText.innerText = 'Requesting access...';
-                    cameraIcon.className = 'ph ph-spinner animate-spin text-3xl text-indigo-400 mb-2';
-                    
-                    // Request webcam
-                    const stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } } 
-                    });
-                    
-                    // Success: Attach stream and reveal video
-                    webcamVideo.srcObject = stream;
-                    webcamVideo.classList.remove('opacity-0');
-                    webcamVideo.classList.add('opacity-100');
-                    
-                    // Update overlay so text is readable on top of video feed
-                    webcamOverlay.classList.add('bg-slate-900/60', 'p-2', 'rounded-lg', 'backdrop-blur-sm');
-                    cameraStatusText.innerText = 'Camera active';
-                    cameraStatusText.classList.replace('text-slate-500', 'text-green-400');
-                    cameraStatusText.classList.replace('group-hover:text-slate-400', 'group-hover:text-green-300');
-                    cameraIcon.className = 'ph ph-video-camera text-xl text-green-400 mb-1';
-                    
-                    // Show Gesture Status UI
-                    gestureStatus.className = `${baseGestureClasses} bg-slate-800/80 border-slate-600 text-slate-300`;
-                    gestureStatus.innerText = 'Initializing...';
-                    
-                    // Toggle Button
-                    enableCameraBtn.innerText = 'Disable Camera';
-                    enableCameraBtn.classList.replace('bg-indigo-600', 'bg-red-600');
-                    enableCameraBtn.classList.replace('hover:bg-indigo-500', 'hover:bg-red-500');
-
-                    // Initialize and start Hand Tracking
-                    initMediaPipe().then(() => {
-                        trackingLoop();
-                    });
-                    
-                } catch (error) {
-                    console.error('Error accessing webcam:', error);
-                    // Error state (denied or no device)
-                    cameraStatusText.innerText = error.name === 'NotAllowedError' 
-                        ? 'Permission denied' 
-                        : 'Camera unavailable';
-                    cameraStatusText.classList.replace('text-slate-500', 'text-red-400');
-                    cameraIcon.className = 'ph ph-warning-circle text-3xl text-red-400 mb-2';
-                }
-            } else {
-                // Disable camera functionality
-                const stream = webcamVideo.srcObject;
-                if (stream) {
-                    const tracks = stream.getTracks();
-                    tracks.forEach(track => track.stop());
-                }
+            if (!handLandmarker) await initializeHandLandmarker();
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                webcamVideo.srcObject = stream;
+                enableCameraBtn.classList.add('hidden');
+                webcamVideo.classList.remove('hidden');
                 
-                // Hide video
-                webcamVideo.srcObject = null;
-                webcamVideo.classList.add('opacity-0');
-                webcamVideo.classList.remove('opacity-100');
-                
-                // Reset UI
-                webcamOverlay.classList.remove('bg-slate-900/60', 'p-2', 'rounded-lg', 'backdrop-blur-sm');
-                cameraStatusText.innerText = 'Camera inactive';
-                cameraStatusText.classList.remove('text-green-400', 'text-red-400');
-                cameraStatusText.classList.add('text-slate-500');
-                cameraIcon.className = 'ph ph-video-camera-slash text-3xl text-slate-600 mb-2 group-hover:text-slate-400 transition-colors';
-                
-                // Reset Gesture UI
-                gestureStatus.className = 'hidden';
-                if (trackingAnimationFrame) {
-                    cancelAnimationFrame(trackingAnimationFrame);
-                }
-                
-                currentGesture = 'NONE';
-                pendingGesture = 'NONE';
-                gestureActionFired = false;
-                isRewinding = false;
-                
-                // Reset Button
-                enableCameraBtn.innerText = 'Enable Camera';
-                enableCameraBtn.classList.replace('bg-red-600', 'bg-indigo-600');
-                enableCameraBtn.classList.replace('hover:bg-red-500', 'hover:bg-indigo-500');
+                webcamVideo.addEventListener("loadeddata", () => {
+                    webcamRunning = true;
+                    predictWebcam();
+                });
+            } catch (err) {
+                console.error(err);
+                gestureStatus.innerText = "Camera denied";
+                pulseDot.classList.remove('animate-pulse', 'bg-slate-600', 'bg-emerald-500');
+                pulseDot.classList.add('bg-red-500');
             }
         });
-        
+
+        function getGesture(landmarks) {
+            const thumbTip = landmarks[4], indexTip = landmarks[8];
+            const middleTip = landmarks[12], ringTip = landmarks[16], pinkyTip = landmarks[20];
+            const indexMcp = landmarks[5], middleMcp = landmarks[9];
+            const ringMcp = landmarks[13], pinkyMcp = landmarks[17], wrist = landmarks[0];
+
+            const isIndexExt = indexTip.y < indexMcp.y;
+            const isMiddleExt = middleTip.y < middleMcp.y;
+            const isRingExt = ringTip.y < ringMcp.y;
+            const isPinkyExt = pinkyTip.y < pinkyMcp.y;
+            
+            const thumbIsUp = thumbTip.y < indexMcp.y && thumbTip.y < wrist.y;
+            const fingersClosed = !isIndexExt && !isMiddleExt && !isRingExt && !isPinkyExt;
+
+            if (isIndexExt && isMiddleExt && isRingExt && isPinkyExt) return 'OPEN_PALM';
+            if (isIndexExt && !isMiddleExt && !isRingExt && !isPinkyExt) return 'POINT_UP';
+            if (thumbIsUp && fingersClosed) return 'THUMB_UP';
+            if (fingersClosed && !thumbIsUp) return 'CLOSED_FIST';
+
+            return 'UNKNOWN';
+        }
+
+        async function predictWebcam() {
+            if (!webcamRunning) return;
+
+            if (lastVideoTime !== webcamVideo.currentTime) {
+                lastVideoTime = webcamVideo.currentTime;
+                const startTimeMs = performance.now();
+                const results = handLandmarker.detectForVideo(webcamVideo, startTimeMs);
+
+                let detectedRaw = null;
+                if (results.landmarks && results.landmarks.length > 0) {
+                    webcamContainer.classList.add('border-indigo-500');
+                    detectedRaw = getGesture(results.landmarks[0]);
+                } else {
+                    webcamContainer.classList.remove('border-indigo-500');
+                }
+                
+                // Debounce raw gesture to tolerate brief tracking fluctuations
+                if (detectedRaw !== lastRawGesture) {
+                    lastRawGesture = detectedRaw;
+                    lastRawGestureTime = Date.now();
+                }
+                
+                // Only commit to a gesture if it has been stable for 150ms
+                if (Date.now() - lastRawGestureTime > 150) {
+                    if (currentGesture !== detectedRaw) {
+                        currentGesture = detectedRaw;
+                        gestureStartTime = Date.now();
+                        gestureActionFired = false;
+                        
+                        // Clear continuous states on gesture change
+                        isRewinding = false;
+                        isIncreasingSpeed = false;
+                        isDecreasingSpeed = false;
+                        evaluateOverlayState();
+                    }
+                }
+
+                if (currentGesture) {
+                    const holdTime = Date.now() - gestureStartTime;
+                    let displayState = "Tracking hand...";
+
+                    if (currentGesture === 'OPEN_PALM') {
+                        if (holdTime >= 500 && !gestureActionFired) {
+                            window.togglePlay();
+                            gestureActionFired = true;
+                            showGestureFeedback(isPlaying ? 'RESUMED' : 'PAUSED', isPlaying ? '▶️' : '✋');
+                        }
+                        displayState = isPlaying ? "▶️ Resumed" : "✋ Paused";
+                    } 
+                    else if (currentGesture === 'POINT_UP') {
+                        if (holdTime >= 200) {
+                            if (!isRewinding) {
+                                isRewinding = true;
+                                evaluateOverlayState();
+                            }
+                        }
+                        displayState = "↩️ Rewinding";
+                    }
+                    else if (currentGesture === 'THUMB_UP') {
+                        if (holdTime >= 300) {
+                            if (!isIncreasingSpeed) {
+                                isIncreasingSpeed = true;
+                                evaluateOverlayState();
+                            }
+                        }
+                        displayState = "👍 Faster";
+                    }
+                    else if (currentGesture === 'CLOSED_FIST') {
+                        if (holdTime >= 300) {
+                            if (!isDecreasingSpeed) {
+                                isDecreasingSpeed = true;
+                                evaluateOverlayState();
+                            }
+                        }
+                        displayState = "✊ Slower";
+                    }
+
+                    gestureStatus.innerText = displayState;
+                } else {
+                    // Hand lost or completely unknown
+                    gestureStatus.innerText = "Camera active";
+                    if (isRewinding || isIncreasingSpeed || isDecreasingSpeed) {
+                        isRewinding = false;
+                        isIncreasingSpeed = false;
+                        isDecreasingSpeed = false;
+                        evaluateOverlayState();
+                    }
+                }
+            }
+            requestAnimationFrame(predictWebcam);
+        }
     </script>
 </body>
 </html>
